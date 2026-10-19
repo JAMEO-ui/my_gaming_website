@@ -1,0 +1,644 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Number Quest | Puzzle Game</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        padding: 20px 12px 40px;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        color: white;
+        background: #0b1020;
+    }
+
+    header {
+        padding: 10px;
+    }
+
+    h1 {
+        color: #38bdf8;
+        margin-bottom: 8px;
+    }
+
+    p {
+        color: #cbd5e1;
+    }
+
+    .panel {
+        width: min(100%, 520px);
+        margin: 18px auto;
+        padding: 18px;
+        border: 1px solid #293650;
+        border-radius: 16px;
+        background: #151e32;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+    }
+
+    select, button {
+        font: inherit;
+        border-radius: 8px;
+    }
+
+    select {
+        padding: 10px;
+        color: white;
+        background: #243654;
+        border: 1px solid #526580;
+    }
+
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin: 20px auto;
+        max-width: 520px;
+    }
+
+    .stat {
+        background: #151e32;
+        border: 1px solid #293650;
+        border-radius: 10px;
+        padding: 12px 4px;
+    }
+
+    .stat strong {
+        display: block;
+        color: #38bdf8;
+        font-size: clamp(18px, 4vw, 25px);
+        margin-top: 8px;
+    }
+
+    #board {
+        width: min(92vw, 400px);
+        aspect-ratio: 1;
+        margin: 20px auto;
+        display: grid;
+        gap: 6px;
+        touch-action: manipulation;
+    }
+
+    .tile {
+        min-width: 0;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 9px;
+        color: white;
+        background: #28446c;
+        font-size: clamp(17px, 5vw, 30px);
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 3px 0 #172944;
+    }
+
+    .tile:hover:not(:disabled) {
+        background: #2563eb;
+    }
+
+    .tile:focus-visible, button:focus-visible {
+        outline: 3px solid #facc15;
+        outline-offset: 2px;
+    }
+
+    .tile:disabled {
+        cursor: default;
+    }
+
+    .empty {
+        background: #0b1020;
+        box-shadow: none;
+        border: 1px dashed #293650;
+    }
+
+    .empty:hover {
+        background: #0b1020;
+    }
+
+    .actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 15px auto;
+    }
+
+    .action {
+        padding: 12px 18px;
+        border: 0;
+        background: #38bdf8;
+        color: #07111f;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .secondary {
+        color: white;
+        background: #334155;
+    }
+
+    #message {
+        min-height: 28px;
+        color: #4ade80;
+        font-weight: bold;
+    }
+
+    .rules {
+        text-align: left;
+        line-height: 1.8;
+        color: #cbd5e1;
+    }
+
+    .leaderboard {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    .leaderboard th, .leaderboard td {
+        padding: 10px 4px;
+        border-bottom: 1px solid #334155;
+        font-size: 14px;
+    }
+
+    .leaderboard th {
+        color: #38bdf8;
+    }
+
+    .name-input {
+        width: min(100%, 240px);
+        padding: 11px;
+        margin: 8px;
+        border-radius: 8px;
+        border: 1px solid #526580;
+        background: #0b1020;
+        color: white;
+    }
+
+    footer {
+        color: #94a3b8;
+        padding: 20px;
+        font-size: 13px;
+    }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🧩 Number Quest</h1>
+    <p>Think fast. Move smart. Solve the puzzle!</p>
+</header>
+
+<div class="panel">
+    <label for="level">Choose your difficulty</label>
+    <select id="level">
+        <option value="3">Easy — 3 × 3</option>
+        <option value="4" selected>Medium — 4 × 4</option>
+        <option value="5">Hard — 5 × 5</option>
+    </select>
+
+    <div class="stats">
+        <div class="stat">
+            Level
+            <strong id="level-name">Medium</strong>
+        </div>
+        <div class="stat">
+            Time
+            <strong id="timer">00:00</strong>
+        </div>
+        <div class="stat">
+            Moves
+            <strong id="moves">0</strong>
+        </div>
+    </div>
+
+    <p>Arrange every number in order. Leave the last square empty.</p>
+
+    <div id="board" aria-label="Number puzzle board"></div>
+
+    <div class="actions">
+        <button class="action" id="new-game">New Game</button>
+        <button class="action secondary" id="show-solution">
+            Show Goal
+        </button>
+    </div>
+
+    <p id="message" role="status" aria-live="polite">
+        Choose a level and start playing!
+    </p>
+</div>
+
+<div class="panel" id="win-panel" hidden>
+    <h2>🎉 Puzzle Solved!</h2>
+    <p id="win-details"></p>
+
+    <label for="player-name">Enter your name for the leaderboard</label>
+    <input class="name-input" id="player-name"
+           maxlength="20" placeholder="Your name">
+
+    <div class="actions">
+        <button class="action" id="save-score">Save Score</button>
+        <button class="action secondary" id="skip-score">
+            Skip
+        </button>
+    </div>
+
+    <p id="save-message" role="status"></p>
+</div>
+
+<div class="panel">
+    <h2>🏆 Leaderboard</h2>
+    <p>Best times saved on this browser, by difficulty.</p>
+
+    <label for="leader-level">View leaderboard</label>
+    <select id="leader-level">
+        <option value="3">Easy</option>
+        <option value="4" selected>Medium</option>
+        <option value="5">Hard</option>
+    </select>
+
+    <table class="leaderboard">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th>Time</th>
+                <th>Moves</th>
+            </tr>
+        </thead>
+        <tbody id="leaderboard-body"></tbody>
+    </table>
+
+    <button class="action secondary" id="clear-scores">
+        Clear All Scores
+    </button>
+</div>
+
+<div class="panel rules">
+    <h2>How to Play</h2>
+    <ul>
+        <li>Click a number next to the empty space to move it.</li>
+        <li>Arrange numbers from smallest to largest.</li>
+        <li>Easy has 8 tiles, Medium has 15, and Hard has 24.</li>
+        <li>Complete the puzzle quickly using as few moves as possible.</li>
+        <li>Save your result to compete with your own best scores.</li>
+    </ul>
+</div>
+
+<footer>
+    Number Quest © 2026 | Created with HTML, CSS and JavaScript
+</footer>
+
+<script>
+    const boardElement = document.getElementById("board");
+    const levelElement = document.getElementById("level");
+    const timerElement = document.getElementById("timer");
+    const movesElement = document.getElementById("moves");
+    const messageElement = document.getElementById("message");
+    const winPanel = document.getElementById("win-panel");
+
+    let size = 4;
+    let tiles = [];
+    let moves = 0;
+    let startedAt = null;
+    let elapsedSeconds = 0;
+    let finished = false;
+    let scoreSaved = false;
+    let timerInterval = null;
+
+    const SCORE_KEY = "numberQuestLeaderboardV1";
+
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+
+        return String(mins).padStart(2, "0") + ":" +
+               String(secs).padStart(2, "0");
+    }
+
+    function getGoal() {
+        return Array.from(
+            { length: size * size },
+            (_, i) => (i + 1) % (size * size)
+        );
+    }
+
+    function isSolved() {
+        const goal = getGoal();
+        return tiles.every((n, i) => n === goal[i]);
+    }
+
+    function getNeighbors(index) {
+        const neighbors = [];
+        const row = Math.floor(index / size);
+        const col = index % size;
+
+        if (row > 0) neighbors.push(index - size);
+        if (row < size - 1) neighbors.push(index + size);
+        if (col > 0) neighbors.push(index - 1);
+        if (col < size - 1) neighbors.push(index + 1);
+
+        return neighbors;
+    }
+
+    function shuffleTiles() {
+        tiles = getGoal();
+
+        let empty = tiles.length - 1;
+        let previousEmpty = -1;
+
+        // Shuffle by legal moves, guaranteeing solvability.
+        for (let i = 0; i < size * size * 60; i++) {
+            let choices = getNeighbors(empty).filter(
+                index => index !== previousEmpty
+            );
+
+            const next =
+                choices[Math.floor(Math.random() * choices.length)];
+
+            [tiles[empty], tiles[next]] =
+                [tiles[next], tiles[empty]];
+
+            previousEmpty = empty;
+            empty = next;
+        }
+
+        // Make sure the new board is not already solved.
+        if (isSolved()) {
+            const next = getNeighbors(empty)[0];
+
+            [tiles[empty], tiles[next]] =
+                [tiles[next], tiles[empty]];
+        }
+    }
+
+    function renderBoard() {
+        boardElement.innerHTML = "";
+        boardElement.style.gridTemplateColumns =
+            `repeat(${size}, minmax(0, 1fr))`;
+
+        tiles.forEach((number, index) => {
+            const button = document.createElement("button");
+
+            button.className = number === 0 ? "tile empty" : "tile";
+            button.textContent = number === 0 ? "" : number;
+            button.setAttribute(
+                "aria-label",
+                number === 0 ? "Empty space" : "Tile " + number
+            );
+
+            const emptyIndex = tiles.indexOf(0);
+            const canMove = getNeighbors(emptyIndex).includes(index);
+
+            button.disabled = number === 0 || finished || !canMove;
+
+            if (number === 0) {
+                button.classList.add("empty");
+            }
+
+            button.addEventListener("click", () => moveTile(index));
+            boardElement.appendChild(button);
+        });
+    }
+
+    function updateStats() {
+        movesElement.textContent = moves;
+        timerElement.textContent = formatTime(elapsedSeconds);
+    }
+
+    function startTimer() {
+        if (startedAt !== null) return;
+
+        startedAt = Date.now() - elapsedSeconds * 1000;
+
+        timerInterval = setInterval(() => {
+            elapsedSeconds = Math.floor(
+                (Date.now() - startedAt) / 1000
+            );
+
+            timerElement.textContent = formatTime(elapsedSeconds);
+        }, 250);
+    }
+
+    function stopTimer() {
+        if (timerInterval !== null) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+
+    function moveTile(index) {
+        if (finished) return;
+
+        const emptyIndex = tiles.indexOf(0);
+
+        if (!getNeighbors(emptyIndex).includes(index)) return;
+
+        startTimer();
+
+        [tiles[index], tiles[emptyIndex]] =
+            [tiles[emptyIndex], tiles[index]];
+
+        moves++;
+        updateStats();
+        renderBoard();
+
+        if (isSolved()) {
+            winGame();
+        }
+    }
+
+    function winGame() {
+        finished = true;
+        stopTimer();
+
+        if (startedAt !== null) {
+            elapsedSeconds = Math.floor(
+                (Date.now() - startedAt) / 1000
+            );
+        }
+
+        updateStats();
+
+        messageElement.textContent = "Amazing! You solved it!";
+        document.getElementById("win-details").textContent =
+            `Level: ${levelName()} | Time: ${formatTime(elapsedSeconds)} | ` +
+            `Moves: ${moves}`;
+
+        winPanel.hidden = false;
+        document.getElementById("player-name").value = "";
+        document.getElementById("save-message").textContent = "";
+        document.getElementById("save-score").disabled = false;
+        document.getElementById("skip-score").disabled = false;
+
+        scoreSaved = false;
+        renderBoard();
+
+        winPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function levelName() {
+        return size === 3 ? "Easy" :
+               size === 4 ? "Medium" : "Hard";
+    }
+
+    function newGame() {
+        stopTimer();
+
+        size = Number(levelElement.value);
+        moves = 0;
+        startedAt = null;
+        elapsedSeconds = 0;
+        finished = false;
+        scoreSaved = false;
+
+        winPanel.hidden = true;
+
+        document.getElementById("level-name").textContent = levelName();
+        messageElement.textContent =
+            "Puzzle ready! Make your first move to start the timer.";
+
+        shuffleTiles();
+        updateStats();
+        renderBoard();
+    }
+
+    function showGoal() {
+        const goal = getGoal();
+
+        alert(
+            goal.map(n => n === 0 ? "□" : n)
+                .reduce((rows, n, i) => {
+                    if (i % size === 0) rows.push([]);
+                    rows[rows.length - 1].push(n);
+                    return rows;
+                }, [])
+                .map(row => row.join("  "))
+                .join("\n")
+        );
+    }
+
+    function readScores() {
+        try {
+            const data = JSON.parse(localStorage.getItem(SCORE_KEY) || "[]");
+            return Array.isArray(data) ? data : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function saveScore() {
+        if (scoreSaved || !finished) return;
+
+        const nameInput = document.getElementById("player-name");
+        const name = nameInput.value.trim().slice(0, 20) || "Player";
+
+        const scores = readScores();
+
+        scores.push({
+            name,
+            level: size,
+            time: elapsedSeconds,
+            moves,
+            date: new Date().toISOString()
+        });
+
+        try {
+            localStorage.setItem(SCORE_KEY, JSON.stringify(scores));
+            scoreSaved = true;
+
+            document.getElementById("save-message").textContent =
+                "Score saved on this browser!";
+
+            document.getElementById("save-score").disabled = true;
+            document.getElementById("skip-score").disabled = true;
+
+            document.getElementById("leader-level").value = String(size);
+            renderLeaderboard();
+        } catch {
+            document.getElementById("save-message").textContent =
+                "Could not save. Your browser may block local storage.";
+        }
+    }
+
+    function renderLeaderboard() {
+        const level = Number(
+            document.getElementById("leader-level").value
+        );
+
+        const scores = readScores()
+            .filter(score => score.level === level)
+            .sort((a, b) => a.time - b.time || a.moves - b.moves)
+            .slice(0, 10);
+
+        const body = document.getElementById("leaderboard-body");
+        body.innerHTML = "";
+
+        if (scores.length === 0) {
+            const row = body.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 4;
+            cell.textContent = "No scores yet. Be the first!";
+            return;
+        }
+
+        scores.forEach((score, index) => {
+            const row = body.insertRow();
+
+            [
+                index + 1,
+                score.name,
+                formatTime(score.time),
+                score.moves
+            ].forEach(value => {
+                const cell = row.insertCell();
+                cell.textContent = value;
+            });
+        });
+    }
+
+    function clearScores() {
+        if (!confirm("Delete all saved leaderboard scores?")) return;
+
+        try {
+            localStorage.removeItem(SCORE_KEY);
+            renderLeaderboard();
+        } catch {
+            alert("Your browser did not allow the scores to be cleared.");
+        }
+    }
+
+    levelElement.addEventListener("change", newGame);
+    document.getElementById("new-game").addEventListener("click", newGame);
+    document.getElementById("show-solution").addEventListener("click", showGoal);
+    document.getElementById("save-score").addEventListener("click", saveScore);
+    document.getElementById("skip-score").addEventListener("click", () => {
+        winPanel.hidden = true;
+    });
+    document.getElementById("leader-level").addEventListener(
+        "change", renderLeaderboard
+    );
+    document.getElementById("clear-scores").addEventListener(
+        "click", clearScores
+    );
+
+    newGame();
+    renderLeaderboard();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Number Puzzle Game</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        padding: 25px 12px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+        color: white;
+        background: #0b1020;
+    }
+
+    h1 {
+        color: #38bdf8;
+    }
+
+    p {
+        color: #cbd5e1;
+    }
+
+    #board {
+        width: min(90vw, 360px);
+        aspect-ratio: 1;
+        margin: 25px auto;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 7px;
+    }
+
+    .tile {
+        border: 0;
+        border-radius: 10px;
+        background: #243654;
+        color: white;
+        font-size: clamp(20px, 6vw, 32px);
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .tile:hover {
+        background: #2563eb;
+    }
+
+    .empty {
+        background: #0b1020;
+        cursor: default;
+    }
+
+    .empty:hover {
+        background: #0b1020;
+    }
+
+    .controls button {
+        background: #38bdf8;
+        color: #07111f;
+        padding: 12px 18px;
+        margin: 5px;
+        border: 0;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    #message {
+        color: #4ade80;
+        font-weight: bold;
+        min-height: 24px;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>🧩 Number Puzzle</h1>
+<p>Arrange the numbers from 1 to 15 in order.</p>
+<p>Click a number beside the empty space to move it.</p>
+
+<h3>Moves: <span id="moves">0</span></h3>
+
+<div id="board"></div>
+
+<div class="controls">
+    <button onclick="newGame()">New Game</button>
+    <button onclick="solveReset()">Reset</button>
+</div>
+
+<p id="message">Good luck!</p>
+
+<script>
+    let tiles = [];
+    let moves = 0;
+    let won = false;
+
+    function newGame() {
+        tiles = Array.from({length: 16}, (_, i) =>
+            (i + 1) % 16
+        );
+
+        // Shuffle using valid moves so the puzzle is solvable.
+        let empty = 15;
+        let previousEmpty = -1;
+
+        for (let i = 0; i < 300; i++) {
+            let neighbors = [empty - 4, empty + 4];
+
+            if (empty % 4 !== 0) neighbors.push(empty - 1);
+            if (empty % 4 !== 3) neighbors.push(empty + 1);
+
+            neighbors = neighbors.filter(n =>
+                n >= 0 && n < 16 && n !== previousEmpty
+            );
+
+            const next =
+                neighbors[Math.floor(Math.random() * neighbors.length)];
+
+            [tiles[empty], tiles[next]] =
+                [tiles[next], tiles[empty]];
+
+            previousEmpty = empty;
+            empty = next;
+        }
+
+        moves = 0;
+        won = false;
+        document.getElementById("message").textContent =
+            "Good luck!";
+        render();
+    }
+
+    function render() {
+        const board = document.getElementById("board");
+        board.innerHTML = "";
+
+        tiles.forEach((number, index) => {
+            const tile = document.createElement("button");
+            tile.className = number === 0 ? "tile empty" : "tile";
+            tile.textContent = number === 0 ? "" : number;
+            tile.setAttribute("aria-label",
+                number === 0 ? "Empty space" : "Tile " + number
+            );
+
+            if (number === 0) {
+                tile.disabled = true;
+            } else {
+                tile.onclick = () => moveTile(index);
+            }
+
+            board.appendChild(tile);
+        });
+
+        document.getElementById("moves").textContent = moves;
+    }
+
+    function moveTile(index) {
+        if (won) return;
+
+        const empty = tiles.indexOf(0);
+
+        const isNeighbor =
+            Math.abs(index - empty) === 4 ||
+            (Math.floor(index / 4) === Math.floor(empty / 4) &&
+             Math.abs(index - empty) === 1);
+
+        if (!isNeighbor) return;
+
+        [tiles[index], tiles[empty]] =
+            [tiles[empty], tiles[index]];
+
+        moves++;
+        render();
+
+        if (tiles.every((n, i) => n === (i + 1) % 16)) {
+            won = true;
+            document.getElementById("message").textContent =
+                "🎉 You solved the puzzle in " + moves + " moves!";
+        }
+    }
+
+    function solveReset() {
+        tiles = Array.from({length: 16}, (_, i) =>
+            (i + 1) % 16
+        );
+        moves = 0;
+        won = false;
+        document.getElementById("message").textContent =
+            "Puzzle reset. Start arranging!";
+        render();
+    }
+
+    newGame();
+</script>
+
+</body>
+</html>
