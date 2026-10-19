@@ -1,0 +1,591 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Adventure: Coin Quest</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #10172b;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 18px;
+  }
+  .game {
+    width: min(100%, 1000px);
+    text-align: center;
+  }
+  h1 {
+    margin: 0 0 8px;
+    color: #ffd45c;
+    font-size: clamp(25px, 5vw, 40px);
+  }
+  .subtitle { color: #c6d4f4; margin: 0 0 16px; }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: #202b48;
+    border: 1px solid #38496e;
+    border-radius: 12px 12px 0 0;
+    font-weight: bold;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    background: #8bd8ff;
+    border: 2px solid #38496e;
+    border-top: 0;
+    image-rendering: auto;
+  }
+  .controls {
+    color: #d7e2ff;
+    font-size: 14px;
+    line-height: 1.8;
+    background: #202b48;
+    padding: 12px;
+    border-radius: 0 0 12px 12px;
+  }
+  button {
+    border: 0;
+    border-radius: 9px;
+    padding: 12px 22px;
+    margin: 10px 5px 0;
+    background: #ffd45c;
+    color: #18213b;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover { background: #ffe797; transform: translateY(-1px); }
+  .secondary { background: #91aaff; }
+  .message {
+    min-height: 28px;
+    margin-top: 12px;
+    font-weight: bold;
+    color: #ffe797;
+  }
+  .mobile-controls {
+    display: none;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .mobile-controls button {
+    min-width: 64px;
+    min-height: 52px;
+    font-size: 22px;
+    margin: 0;
+    touch-action: none;
+  }
+  @media (pointer: coarse) {
+    .mobile-controls { display: flex; }
+  }
+</style>
+</head>
+<body>
+<main class="game">
+  <h1>🌟 Platform Adventure</h1>
+  <p class="subtitle">COIN QUEST — Collect coins and reach the flag!</p>
+
+  <div class="hud">
+    <span>⭐ Score: <span id="score">0</span></span>
+    <span>🪙 Coins: <span id="coins">0</span>/<span id="totalCoins">0</span></span>
+    <span>🏁 Goal: Reach the flag!</span>
+  </div>
+
+  <canvas id="gameCanvas" width="960" height="540"
+          aria-label="Platform adventure game"></canvas>
+
+  <div class="controls">
+    <strong>Keyboard:</strong> ← → or A/D to move · SPACE, ↑ or W to jump · R to restart
+    <br>
+    Collect gold coins, jump over red spikes and avoid the moving enemies!
+  </div>
+
+  <div class="mobile-controls">
+    <button id="leftBtn" aria-label="Move left">◀</button>
+    <button id="jumpBtn" aria-label="Jump">⬆ JUMP</button>
+    <button id="rightBtn" aria-label="Move right">▶</button>
+  </div>
+
+<div class="game-card">
+    <h3>🌟 Platform Adventure</h3>
+    <p>Collect coins, jump across platforms, avoid enemies, and reach the finish!</p>
+    <a href="platform_adventure.html" class="button">
+        Play Now
+    </a>
+</div>
+
+  <button id="startBtn">▶ Start Game</button>
+  <button id="restartBtn" class="secondary">↻ Restart</button>
+  <div class="message" id="message">Press Start Game when you're ready!</div>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const scoreText = document.getElementById("score");
+  const coinsText = document.getElementById("coins");
+  const totalCoinsText = document.getElementById("totalCoins");
+  const message = document.getElementById("message");
+  const startBtn = document.getElementById("startBtn");
+
+  const W = canvas.width;
+  const H = canvas.height;
+  const WORLD_WIDTH = 3000;
+  const GRAVITY = 0.65;
+  const keys = {};
+  let running = false;
+  let finished = false;
+  let won = false;
+  let score = 0;
+  let collected = 0;
+  let cameraX = 0;
+  let animationFrame = 0;
+
+  const player = {
+    x: 55, y: 350, w: 32, h: 42,
+    vx: 0, vy: 0, speed: 4.4, jump: 12.5,
+    grounded: false, color: "#6c54e8"
+  };
+
+  const platforms = [
+    {x:0,y:465,w:390,h:100},
+    {x:460,y:465,w:300,h:100},
+    {x:830,y:465,w:280,h:100},
+    {x:1180,y:465,w:350,h:100},
+    {x:1600,y:465,w:260,h:100},
+    {x:1930,y:465,w:320,h:100},
+    {x:2320,y:465,w:680,h:100},
+
+    {x:180,y:370,w:130,h:18},
+    {x:350,y:305,w:120,h:18},
+    {x:530,y:370,w:130,h:18},
+    {x:700,y:310,w:125,h:18},
+    {x:900,y:365,w:125,h:18},
+    {x:1080,y:300,w:130,h:18},
+    {x:1300,y:370,w:135,h:18},
+    {x:1490,y:305,w:125,h:18},
+    {x:1690,y:365,w:125,h:18},
+    {x:1870,y:300,w:125,h:18},
+    {x:2050,y:365,w:130,h:18},
+    {x:2250,y:310,w:140,h:18},
+    {x:2500,y:375,w:145,h:18},
+    {x:2700,y:315,w:120,h:18}
+  ];
+
+  const spikeZones = [
+    {x:395,w:60}, {x:765,w:60}, {x:1115,w:60},
+    {x:1535,w:60}, {x:1865,w:60}, {x:2255,w:60}
+  ];
+
+  const coins = [];
+  function addCoin(x, y) {
+    coins.push({x, y, r: 11, taken: false, phase: Math.random() * 6});
+  }
+
+  [
+    [220,330],[390,265],[565,330],[735,270],[940,325],
+    [1115,260],[1350,330],[1540,265],[1730,325],[1920,260],
+    [2100,325],[2300,270],[2550,335],[2740,275],
+    [490,420],[850,420],[1200,420],[1630,420],[1970,420],
+    [2370,420],[2860,420]
+  ].forEach(([x,y]) => addCoin(x,y));
+
+  totalCoinsText.textContent = coins.length;
+
+  const enemies = [
+    {x:580,y:429,w:30,h:36,min:500,max:720,vx:1.5},
+    {x:1240,y:429,w:30,h:36,min:1200,max:1490,vx:1.8},
+    {x:1990,y:429,w:30,h:36,min:1950,max:2210,vx:2}
+  ];
+
+  function resetGame() {
+    player.x = 55;
+    player.y = 350;
+    player.vx = 0;
+    player.vy = 0;
+    player.grounded = false;
+    cameraX = 0;
+    score = 0;
+    collected = 0;
+    coins.forEach(c => c.taken = false);
+    enemies[0].x = 580;
+    enemies[1].x = 1240;
+    enemies[2].x = 1990;
+    enemies.forEach(e => e.vx = Math.abs(e.vx));
+    finished = false;
+    won = false;
+    updateHUD();
+    message.textContent = "Collect coins and make it to the flag!";
+  }
+
+  function updateHUD() {
+    scoreText.textContent = score;
+    coinsText.textContent = collected;
+  }
+
+  function startGame() {
+    if (running) return;
+    if (finished) resetGame();
+    running = true;
+    startBtn.textContent = "▶ Game Running";
+    message.textContent = "Good luck, adventurer!";
+    requestAnimationFrame(loop);
+  }
+
+  function endGame(victory) {
+    running = false;
+    finished = true;
+    won = victory;
+    startBtn.textContent = victory ? "Play Again" : "Try Again";
+    message.textContent = victory
+      ? `🏆 You won! Final score: ${score}`
+      : `💥 Game over! Final score: ${score}. Press Try Again.`;
+    draw();
+  }
+
+  function overlaps(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x &&
+           a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function update() {
+    if (!running) return;
+
+    player.vx = 0;
+    if (keys.ArrowLeft || keys.KeyA) player.vx = -player.speed;
+    if (keys.ArrowRight || keys.KeyD) player.vx = player.speed;
+
+    // Move horizontally and prevent walking through platforms.
+    player.x += player.vx;
+    player.x = Math.max(0, Math.min(WORLD_WIDTH - player.w, player.x));
+
+    // Jump only when standing on a platform.
+    if ((keys.Space || keys.ArrowUp || keys.KeyW) && player.grounded) {
+      player.vy = -player.jump;
+      player.grounded = false;
+    }
+
+    const oldBottom = player.y + player.h;
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    player.grounded = false;
+
+    for (const p of platforms) {
+      const horizontal = player.x + player.w > p.x &&
+                         player.x < p.x + p.w;
+      if (horizontal && oldBottom <= p.y &&
+          player.y + player.h >= p.y && player.vy >= 0) {
+        player.y = p.y - player.h;
+        player.vy = 0;
+        player.grounded = true;
+      }
+    }
+
+    // Collect coins.
+    for (const c of coins) {
+      if (c.taken) continue;
+      const dx = player.x + player.w / 2 - c.x;
+      const dy = player.y + player.h / 2 - c.y;
+      if (Math.hypot(dx, dy) < c.r + 22) {
+        c.taken = true;
+        collected++;
+        score += 100;
+        updateHUD();
+      }
+    }
+
+    // Move enemies and check collisions.
+    for (const e of enemies) {
+      e.x += e.vx;
+      if (e.x < e.min || e.x + e.w > e.max) e.vx *= -1;
+      if (overlaps(player, e)) {
+        endGame(false);
+        return;
+      }
+    }
+
+    // Spike collision.
+    for (const s of spikeZones) {
+      const spike = {x:s.x, y:445, w:s.w, h:20};
+      if (overlaps(player, spike)) {
+        endGame(false);
+        return;
+      }
+    }
+
+    // Falling off the level means game over.
+    if (player.y > H + 80) {
+      endGame(false);
+      return;
+    }
+
+    // Reach the finish flag.
+    if (player.x + player.w >= WORLD_WIDTH - 65) {
+      score += 500;
+      updateHUD();
+      endGame(true);
+      return;
+    }
+
+    cameraX = Math.max(0, Math.min(
+      WORLD_WIDTH - W,
+      player.x - W * 0.35
+    ));
+  }
+
+  function roundedRect(x,y,w,h,r,color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,h,r);
+    ctx.fill();
+  }
+
+  function drawBackground() {
+    const sky = ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,"#72cfff");
+    sky.addColorStop(1,"#d5f4ff");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0,0,W,H);
+
+    // Distant hills.
+    for (let i = 0; i < 8; i++) {
+      const x = i * 190 - (cameraX * 0.22 % 190);
+      ctx.fillStyle = i % 2 ? "#79c99a" : "#61b68c";
+      ctx.beginPath();
+      ctx.moveTo(x - 60,465);
+      ctx.quadraticCurveTo(x + 50,285,x + 190,465);
+      ctx.fill();
+    }
+
+    // Clouds.
+    for (let i = 0; i < 9; i++) {
+      const x = ((i * 155 - cameraX * 0.12) % (W + 180) + W + 180) % (W + 180);
+      const y = 55 + (i % 3) * 42;
+      ctx.fillStyle = "rgba(255,255,255,.85)";
+      ctx.beginPath();
+      ctx.arc(x,y,19,0,Math.PI*2);
+      ctx.arc(x+22,y-10,24,0,Math.PI*2);
+      ctx.arc(x+46,y,18,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawPlatforms() {
+    for (const p of platforms) {
+      const x = p.x - cameraX;
+      if (x + p.w < -20 || x > W + 20) continue;
+
+      ctx.fillStyle = "#8b572a";
+      ctx.fillRect(x,p.y,p.w,p.h);
+      ctx.fillStyle = "#36b85b";
+      ctx.fillRect(x,p.y,p.w,9);
+
+      ctx.fillStyle = "#b97a42";
+      for (let bx = x + 12; bx < x + p.w - 8; bx += 35) {
+        ctx.fillRect(bx,p.y + 22,15,7);
+      }
+    }
+  }
+
+  function drawSpikes() {
+    for (const s of spikeZones) {
+      const x = s.x - cameraX;
+      ctx.fillStyle = "#e83f5b";
+      for (let sx = x; sx < x + s.w; sx += 20) {
+        ctx.beginPath();
+        ctx.moveTo(sx,465);
+        ctx.lineTo(sx+10,438);
+        ctx.lineTo(sx+20,465);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawCoins() {
+    for (const c of coins) {
+      if (c.taken) continue;
+      const x = c.x - cameraX;
+      if (x < -30 || x > W+30) continue;
+      const wobble = Math.sin(animationFrame * .08 + c.phase) * 2;
+      ctx.fillStyle = "#f4a900";
+      ctx.beginPath();
+      ctx.arc(x,c.y+wobble,c.r+2,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ffe66d";
+      ctx.beginPath();
+      ctx.arc(x,c.y+wobble,c.r-2,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#b87b00";
+      ctx.font = "bold 13px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("$",x,c.y+wobble+5);
+    }
+  }
+
+  function drawEnemies() {
+    for (const e of enemies) {
+      const x = e.x - cameraX;
+      roundedRect(x,e.y,e.w,e.h,9,"#e84b4b");
+      ctx.fillStyle = "white";
+      ctx.fillRect(x+6,e.y+8,7,9);
+      ctx.fillRect(x+18,e.y+8,7,9);
+      ctx.fillStyle = "#18213b";
+      ctx.fillRect(x+9,e.y+11,3,4);
+      ctx.fillRect(x+21,e.y+11,3,4);
+      ctx.fillStyle = "#8e2525";
+      ctx.fillRect(x+8,e.y+26,15,4);
+    }
+  }
+
+  function drawPlayer() {
+    const x = player.x - cameraX;
+    const y = player.y;
+
+    // Shadow.
+    ctx.fillStyle = "rgba(0,0,0,.15)";
+    ctx.beginPath();
+    ctx.ellipse(x+player.w/2,Math.min(y+player.h+3,464),17,4,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Legs and body.
+    roundedRect(x+4,y+27,10,15,3,"#27346d");
+    roundedRect(x+19,y+27,10,15,3,"#27346d");
+    roundedRect(x+2,y+11,28,25,6,player.color);
+
+    // Face.
+    roundedRect(x+4,y,25,23,7,"#ffd0a1");
+    ctx.fillStyle = "#202342";
+    ctx.fillRect(x+10,y+8,3,5);
+    ctx.fillRect(x+21,y+8,3,5);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x+11,y+9,1,2);
+    ctx.fillRect(x+22,y+9,1,2);
+    ctx.strokeStyle = "#a64d50";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x+12,y+17);
+    ctx.lineTo(x+21,y+17);
+    ctx.stroke();
+
+    // Backpack.
+    roundedRect(x-3,y+14,7,16,3,"#f3a63b");
+  }
+
+  function drawFlag() {
+    const x = WORLD_WIDTH - 55 - cameraX;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x,340,7,125);
+    ctx.fillStyle = "#ff4d68";
+    ctx.beginPath();
+    ctx.moveTo(x+7,342);
+    ctx.lineTo(x+65,360);
+    ctx.lineTo(x+7,380);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffd45c";
+    ctx.beginPath();
+    ctx.arc(x+3,337,8,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawOverlay() {
+    if (running) return;
+    ctx.fillStyle = "rgba(12,20,42,.72)";
+    ctx.fillRect(0,0,W,H);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 38px Arial";
+    const heading = finished ? (won ? "YOU WIN! 🏆" : "GAME OVER") : "COIN QUEST";
+    ctx.fillText(heading,W/2,H/2-32);
+    ctx.font = "20px Arial";
+    ctx.fillStyle = "#ffe797";
+    const line = finished
+      ? (won ? `Final score: ${score}` : `Score: ${score} — give it another try!`)
+      : "Collect coins, avoid danger, reach the flag!";
+    ctx.fillText(line,W/2,H/2+10);
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("Press Start Game to begin",W/2,H/2+45);
+  }
+
+  function draw() {
+    drawBackground();
+    drawPlatforms();
+    drawSpikes();
+    drawCoins();
+    drawEnemies();
+    drawFlag();
+    drawPlayer();
+    drawOverlay();
+  }
+
+  function loop() {
+    if (!running) return;
+    animationFrame++;
+    update();
+    draw();
+    if (running) requestAnimationFrame(loop);
+  }
+
+  document.addEventListener("keydown", e => {
+    if (["ArrowLeft","ArrowRight","ArrowUp","Space"].includes(e.code)) {
+      e.preventDefault();
+    }
+    keys[e.code] = true;
+    if (e.code === "KeyR") {
+      resetGame();
+      running = false;
+      startGame();
+    }
+  });
+
+  document.addEventListener("keyup", e => {
+    keys[e.code] = false;
+  });
+
+  window.addEventListener("blur", () => {
+    for (const key in keys) keys[key] = false;
+  });
+
+  startBtn.addEventListener("click", startGame);
+  document.getElementById("restartBtn").addEventListener("click", () => {
+    running = false;
+    resetGame();
+    draw();
+    startGame();
+  });
+
+  // Optional touch controls for phones and tablets.
+  function bindHold(id, code) {
+    const btn = document.getElementById(id);
+    const down = e => { e.preventDefault(); keys[code] = true; };
+    const up = e => { e.preventDefault(); keys[code] = false; };
+    btn.addEventListener("pointerdown", down);
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("pointerleave", up);
+  }
+  bindHold("leftBtn","ArrowLeft");
+  bindHold("rightBtn","ArrowRight");
+  bindHold("jumpBtn","Space");
+
+  resetGame();
+  draw();
+})();
+</script>
+</body>
+</html>
